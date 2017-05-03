@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // File struct
@@ -19,16 +20,15 @@ func main() {
 	directory := flag.String("d", ".", "the directory of static file to host")
 	flag.Parse()
 
-	http.Handle("/", jsonDirListing(http.FileServer(http.Dir(*directory))))
+	http.Handle("/", jsonDirListing(http.FileServer(http.Dir(*directory)), *directory))
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
 	log.Fatal(http.ListenAndServe(":"+*port, nil))
 }
 
-func jsonDirListing(h http.Handler) http.HandlerFunc {
+func jsonDirListing(h http.Handler, directory string) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		fp := filepath.Join(".", filepath.Clean(r.URL.Path))
+		fp := filepath.Join(directory, filepath.Clean(r.URL.Path))
 		info, err := os.Stat(fp)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -41,7 +41,8 @@ func jsonDirListing(h http.Handler) http.HandlerFunc {
 			fileList := []File{}
 			err := filepath.Walk(fp, func(path string, f os.FileInfo, err error) error {
 				if !f.IsDir() {
-					fileList = append(fileList, File{path})
+					relativePath := strings.Replace(path, fp+"/", "", 1)
+					fileList = append(fileList, File{relativePath})
 				}
 				return nil
 			})
