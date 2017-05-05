@@ -15,6 +15,17 @@ type File struct {
 	Name string `json:"name"`
 }
 
+// Folder struct
+type Folder struct {
+	File
+}
+
+// FileList struct
+type FileList struct {
+	Folders []Folder `json:"folders"`
+	Files   []File   `json:"files"`
+}
+
 func main() {
 	port := flag.String("p", "8100", "port to serve on")
 	directory := flag.String("d", ".", "the directory of static file to host")
@@ -39,15 +50,18 @@ func jsonDirListing(h http.Handler, directory string) http.HandlerFunc {
 
 		if info.IsDir() {
 			fileList := []File{}
+			dirList := []Folder{}
 			err := filepath.Walk(fp, func(path string, f os.FileInfo, err error) error {
+				relativePath := strings.Replace(path, fp+"/", "", 1)
 				if !f.IsDir() {
-					relativePath := strings.Replace(path, fp+"/", "", 1)
 					fileList = append(fileList, File{relativePath})
+				} else {
+					dirList = append(dirList, Folder{File{relativePath}})
 				}
 				return nil
 			})
 
-			js, err := json.Marshal(fileList)
+			js, err := json.Marshal(FileList{dirList, fileList})
 
 			if err != nil {
 				http.Error(w, "500", http.StatusInternalServerError)
