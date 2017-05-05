@@ -56,7 +56,9 @@ func jsonDirListing(h http.Handler, directory string) http.HandlerFunc {
 				if !f.IsDir() {
 					fileList = append(fileList, File{relativePath})
 				} else {
-					dirList = append(dirList, Folder{File{relativePath}})
+					if relativePath != fp {
+						dirList = append(dirList, Folder{File{relativePath}})
+					}
 				}
 				return nil
 			})
