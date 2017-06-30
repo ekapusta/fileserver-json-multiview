@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -12,8 +15,9 @@ import (
 
 // File struct
 type File struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Checksum string `json:"sha1"`
 }
 
 func main() {
@@ -25,6 +29,23 @@ func main() {
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
 	log.Fatal(http.ListenAndServe(":"+*port, nil))
+}
+
+func sha1sum(filePath string) (result string, err error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	hash := sha1.New()
+	_, err = io.Copy(hash, file)
+	if err != nil {
+		return
+	}
+
+	result = hex.EncodeToString(hash.Sum(nil))
+	return
 }
 
 func jsonDirListing(h http.Handler, directory string) http.HandlerFunc {
@@ -43,13 +64,18 @@ func jsonDirListing(h http.Handler, directory string) http.HandlerFunc {
 			err := filepath.Walk(fp, func(path string, f os.FileInfo, err error) error {
 				relativePath := strings.Replace(path, fp+"/", "", 1)
 				var fileType string
+				var fileChecksum string
 				if f.IsDir() {
 					fileType = "folder"
 				} else {
 					fileType = "file"
+					fileChecksum, err = sha1sum(path)
+					if err != nil {
+						return nil
+					}
 				}
 				if relativePath != fp {
-					fileList = append(fileList, File{relativePath, fileType})
+					fileList = append(fileList, File{relativePath, fileType, fileChecksum})
 				}
 				return nil
 			})
